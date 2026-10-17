@@ -12,7 +12,21 @@ public class src extends PApplet {
     map world;
     navigation navigationGrid;
     windVisualization windView;
-    boolean showWind;
+    boolean showWind = true;
+    boolean cityMode = true;
+    CityScene cachedCity;
+    Future<PreparedMap> pendingMap;
+    final ExecutorService mapWorker = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "map-loader");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    static class PreparedMap {
+        final map world;
+        final navigation navigationGrid;
+        PreparedMap(map world, navigation grid) { this.world = world; navigationGrid = grid; }
+    }
     int lastWindMillis;
     static final int HUD_HEIGHT = 60;
     List<int[]> path = Collections.emptyList();
@@ -49,20 +63,23 @@ public class src extends PApplet {
     public void setup() {
         noStroke();
         fill(204);
-        world = new map(this);
-        navigationGrid = new navigation(world);
-        windView = new windVisualization(world);
-        lastWindMillis = millis();
+        regenerateMap();
         surface.setTitle("Terrain | A* and Wind");
     }
 
     public void draw() {
+        finishMap();
+        if (world == null) {
+            background(10); camera(); noLights(); fill(225); textSize(14);
+            text(pathStatus, 20, 40);
+            return;
+        }
         finishSelection();
-        world.update(frameCount);
         int now = millis();
         float seconds = constrain((now - lastWindMillis) / 1000f, 0, 0.05f);
         lastWindMillis = now;
-        if (showWind) windView.update(seconds);
+        world.update(frameCount, seconds);
+        windView.update(seconds);
 
         background(10);
         lights();
@@ -71,9 +88,13 @@ public class src extends PApplet {
 
         // View the centered terrain from above; negative Y is up.
         if (orbit) cameraAngle += 0.002f;
-        float camX = 1400 * cos(cameraAngle);
-        float camZ = 1400 * sin(cameraAngle);
-        camera(camX, -1000, camZ, 0, 0, 0, 0, 1, 0);
+        float viewSpan = world.city == null ? world.w : max(world.w, world.city.tallest * 2);
+        float radius = viewSpan * (world.city == null ? 0.7f : 0.85f);
+        float camY = -viewSpan * (world.city == null ? 0.5f : 0.8f);
+        float focusY = world.city == null ? 0 : -world.city.tallest * 0.3f;
+        float camX = radius * cos(cameraAngle);
+        float camZ = radius * sin(cameraAngle);
+        camera(camX, camY, camZ, 0, focusY, 0, 0, 1, 0);
 
         // Cache the actual rendered view before switching to the HUD camera.
         PGraphicsOpenGL renderer = (PGraphicsOpenGL) g;
@@ -82,32 +103,45 @@ public class src extends PApplet {
         if (!inverseViewProjection.invert()) inverseViewProjection = null;
 
         drawTerrain();
+        if (world.city != null) {
+            world.city.drawRoads(this, showWind);
+            lights();
+            directionalLight(200, 200, 200, 0.3f, -1, -0.4f);
+            ambientLight(80, 80, 90);
+            world.city.drawBuildings(this);
+        }
         drawTrees();
         drawLeaves();
-        if (showWind) windView.draw(this);
+        if (showWind) windView.draw(this, camX, camY, camZ);
         drawPath();
         drawPathHud();
     }
 
     public void mousePressed(processing.event.MouseEvent event) {
-        if (event.getButton() != LEFT) return;
+        if (event.getButton() != LEFT || world == null || pendingMap != null) return;
+        if (world.city != null && event.getX() < width - 220 && event.getY() >= height - 22) {
+            link("https://www.openstreetmap.org/copyright");
+            return;
+        }
         // HUD interactions must never place a path endpoint behind the panel.
         if (event.getY() < HUD_HEIGHT || inverseViewProjection == null) return;
+        if (showWind && windView.overLegend(event.getX(), event.getY(), width, height)) return;
         if (pendingSelection != null) return;
         PVector near = unproject(event.getX(), event.getY(), -1);
         PVector far = unproject(event.getX(), event.getY(), 1);
         PVector direction = PVector.sub(far, near).normalize();
         final int[] from = goal == null ? start : null;
+        final navigation grid = navigationGrid;
         pathStatus = from == null ? "Picking start..." : "Finding route...";
         pendingSelection = pathWorker.submit(() -> {
-            PVector hit = navigationGrid.raycast(near, direction);
+            PVector hit = grid.raycast(near, direction);
             if (hit == null)
                 return new Selection(from, null, null, "No terrain hit. Click inside the map.");
-            int[] selected = navigationGrid.endpoint(hit);
+            int[] selected = grid.endpoint(hit);
             if (selected == null)
                 return new Selection(from, null, null, "No free space above that point. Try another spot.");
             List<int[]> route = from == null ? Collections.emptyList()
-                : astar.findPath(navigationGrid.blocked,
+                : astar.findPath(grid.blocked,
                     from[0], from[1], from[2], selected[0], selected[1], selected[2]);
             return new Selection(from, selected, route, null);
         });
@@ -134,10 +168,10 @@ public class src extends PApplet {
             }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            pathStatus = "Selection interrupted. Press R to reset.";
+            pathStatus = "Selection interrupted. Press R for a new map.";
         } catch (ExecutionException exception) {
             exception.getCause().printStackTrace();
-            pathStatus = "Selection failed. Press R to reset.";
+            pathStatus = "Selection failed. Press R for a new map.";
         }
     }
 
@@ -151,12 +185,62 @@ public class src extends PApplet {
     public void keyPressed() {
         if (key == ' ') orbit = !orbit;
         if (key == 'c' || key == 'C') showWind = !showWind;
-        if (key == 'r' || key == 'R') {
-            if (pendingSelection != null) pendingSelection.cancel(true);
-            pendingSelection = null;
-            start = goal = null;
-            path = Collections.emptyList();
+        if ((key == 'm' || key == 'M') && pendingMap == null) {
+            cityMode = !cityMode;
+            regenerateMap();
+        }
+        if (key == 'r' || key == 'R') regenerateMap();
+    }
+
+    void regenerateMap() {
+        if (pendingMap != null) return;
+        if (pendingSelection != null) pendingSelection.cancel(true);
+        pendingSelection = null;
+        start = goal = null;
+        path = Collections.emptyList();
+        inverseViewProjection = null;
+        noiseSeed(ThreadLocalRandom.current().nextLong());
+        final float nextWindAngle = world == null ? random(TWO_PI)
+            : (world.globalWindAngle + random(QUARTER_PI, TWO_PI - QUARTER_PI)) % TWO_PI;
+        final boolean loadCity = cityMode;
+        pathStatus = loadCity ? "Loading Bloor-Yonge and wind..." : "Generating forest and wind...";
+        pendingMap = mapWorker.submit(() -> {
+            map next = null;
+            try {
+                if (loadCity && cachedCity == null) cachedCity = CityScene.load();
+                next = new map(this, loadCity ? cachedCity : null);
+                next.globalWindAngle = nextWindAngle;
+                navigation grid = new navigation(next);
+                if (Thread.currentThread().isInterrupted()) throw new CancellationException();
+                next.startWind();
+                if (Thread.currentThread().isInterrupted()) throw new CancellationException();
+                return new PreparedMap(next, grid);
+            } catch (RuntimeException exception) {
+                if (next != null) next.close();
+                throw exception;
+            }
+        });
+    }
+
+    void finishMap() {
+        if (pendingMap == null || !pendingMap.isDone()) return;
+        Future<PreparedMap> completed = pendingMap;
+        pendingMap = null;
+        try {
+            PreparedMap prepared = completed.get();
+            if (world != null) world.close();
+            world = prepared.world;
+            navigationGrid = prepared.navigationGrid;
+            windView = new windVisualization(world);
+            inverseViewProjection = null;
+            lastWindMillis = millis();
             pathStatus = "Click terrain to place the start.";
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            pathStatus = "Map loading interrupted.";
+        } catch (ExecutionException | CancellationException exception) {
+            exception.printStackTrace();
+            pathStatus = "Map failed to load. M: switch mode, R: retry.";
         }
     }
 
@@ -200,13 +284,22 @@ public class src extends PApplet {
         rect(0, 0, width, HUD_HEIGHT);
         fill(255);
         textSize(13);
-        text(pathStatus, 14, 22);
+        text((world.city == null ? "Forest | " : "Bloor-Yonge | ") + pathStatus, 14, 22);
         fill(190, 210, 220);
         textSize(11);
         text("Blue: start   Green: route   Space: "
-            + (orbit ? "pause" : "resume") + " camera   R: reset   C: wind "
+            + (orbit ? "pause" : "resume") + " camera   R: new wind/map   M: city/forest   C: wind "
             + (showWind ? "on" : "off"), 14, 46);
         drawWindDirection();
+        if (showWind) windView.drawLegend(this);
+        if (world.city != null) {
+            textAlign(LEFT, BASELINE); textSize(10); fill(0, 190); noStroke();
+            rect(8, height - 43, width - 228, 37, 4);
+            fill(220);
+            text("460 m | Flat ground | " + world.city.levelHeights + " floor estimates, "
+                + world.city.defaultHeights + " default heights", 14, height - 29);
+            text("© OpenStreetMap contributors | ODbL | click for attribution", 14, height - 14);
+        }
         popStyle();
         hint(ENABLE_DEPTH_TEST);
     }
@@ -224,9 +317,12 @@ public class src extends PApplet {
     }
 
     void drawTerrain() {
+        boolean windHeatmap = showWind && windView.prepareGroundColors();
+        // Keep numerical heatmap colours identical to the unlit speed legend.
+        if (windHeatmap) noLights();
         noStroke();
-        int baseGreen = color(140, 220, 140);  // lighter mid green
-        int darkGreen = color(10, 40, 10);     // darker green for low areas
+        int baseGreen = world.city == null ? color(140, 220, 140) : color(170, 177, 183);  // lighter mid green
+        int darkGreen = world.city == null ? color(10, 40, 10) : color(145, 154, 162);     // darker green for low areas
 
         for (int y = 0; y < world.rows - 1; y++) {
             beginShape(TRIANGLE_STRIP);
@@ -235,12 +331,12 @@ public class src extends PApplet {
                 float h2 = world.terrain[x][y + 1];
 
                 // 0 at highest, 1 at lowest (negative Y is up).
-                float t1 = map(h1, -world.terrainHeight / 2, world.terrainHeight / 2, 0, 1);
-                float t2 = map(h2, -world.terrainHeight / 2, world.terrainHeight / 2, 0, 1);
+                float t1 = world.terrainHeight > 0 ? map(h1, -world.terrainHeight / 2, world.terrainHeight / 2, 0, 1) : 0.5f;
+                float t2 = world.terrainHeight > 0 ? map(h2, -world.terrainHeight / 2, world.terrainHeight / 2, 0, 1) : 0.5f;
 
                 // Lower ground -> darker green.
-                int c1 = lerpColor(baseGreen, darkGreen, t1);
-                int c2 = lerpColor(baseGreen, darkGreen, t2);
+                int c1 = windHeatmap ? windView.groundColor(x, y) : lerpColor(baseGreen, darkGreen, t1);
+                int c2 = windHeatmap ? windView.groundColor(x, y + 1) : lerpColor(baseGreen, darkGreen, t2);
 
                 fill(c1);
                 vertex(x * world.scale - world.w / 2f, h1, y * world.scale - world.h / 2f);
@@ -249,6 +345,11 @@ public class src extends PApplet {
                 vertex(x * world.scale - world.w / 2f, h2, (y + 1) * world.scale - world.h / 2f);
             }
             endShape();
+        }
+        if (windHeatmap) {
+            lights();
+            directionalLight(200, 200, 200, 0.3f, -1, -0.4f);
+            ambientLight(40, 40, 60);
         }
     }
 
@@ -295,6 +396,13 @@ public class src extends PApplet {
     }
 
     public void dispose() {
+        if (pendingMap != null) {
+            if (pendingMap.isDone() && !pendingMap.isCancelled()) {
+                try { pendingMap.get().world.close(); } catch (Exception ignored) { }
+            } else pendingMap.cancel(true);
+        }
+        mapWorker.shutdownNow();
+        if (world != null) world.close();
         pathWorker.shutdownNow();
         super.dispose();
     }

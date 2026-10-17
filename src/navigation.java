@@ -12,10 +12,11 @@ public class navigation {
         minX = -world.w / 2f;
         minZ = -world.h / 2f;
         // Enough headroom to travel above the tallest tree, with room below ground.
-        minY = -world.terrainHeight / 2f - 240;
+        minY = world.city == null ? -world.terrainHeight / 2f - 240 : world.airTop();
         int layers = (int) Math.ceil((world.terrainHeight / 2f + cell - minY) / cell);
         blocked = new boolean[world.cols - 1][layers][world.rows - 1];
         buildObstacles();
+        addCityObstacles();
     }
 
     private void buildObstacles() {
@@ -56,6 +57,21 @@ public class navigation {
                         if (canopy || trunk) blocked[x][y][z] = true;
                     }
                 }
+            }
+        }
+    }
+    private void addCityObstacles() {
+        if (world.city == null) return;
+        for (CityScene.Building building : world.city.buildings) {
+            int x0 = Math.max(0, (int) Math.floor((building.bounds.getMinX() - minX) / cell));
+            int x1 = Math.min(blocked.length - 1, (int) Math.floor((building.bounds.getMaxX() - minX) / cell));
+            int z0 = Math.max(0, (int) Math.floor((building.bounds.getMinY() - minZ) / cell));
+            int z1 = Math.min(blocked[0][0].length - 1, (int) Math.floor((building.bounds.getMaxY() - minZ) / cell));
+            int y0 = Math.max(0, (int) Math.floor((-building.height - minY) / cell));
+            int y1 = Math.min(blocked[0].length - 1, (int) Math.floor((-building.bottom - minY) / cell));
+            for (int x = x0; x <= x1; x++) for (int z = z0; z <= z1; z++) {
+                if (!building.overlaps(minX + x * cell, minZ + z * cell, cell)) continue;
+                for (int y = y0; y <= y1; y++) blocked[x][y][z] = true;
             }
         }
     }

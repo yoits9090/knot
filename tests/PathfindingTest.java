@@ -27,7 +27,9 @@ public class PathfindingTest {
             PVector corner = sketch.unproject(800, 0, 1);
             assert corner.x == 0.5f && corner.y == 0.5f && corner.z == 0.5f;
         } finally {
+            if (sketch.world != null) sketch.world.close();
             sketch.pathWorker.shutdownNow();
+            sketch.mapWorker.shutdownNow();
         }
     }
 
@@ -36,12 +38,15 @@ public class PathfindingTest {
         try {
             sketch.width = 800;
             sketch.height = 600;
+            sketch.cityMode = false;
             map world = new map(new PApplet());
             world.cols = world.rows = 4;
             world.w = world.h = 60;
             world.terrain = new float[4][4];
             world.trees = new map.Tree[0];
+            sketch.world = world;
             sketch.navigationGrid = new navigation(world);
+            sketch.windView = new windVisualization(world);
             // Map screen X/Y to terrain X/Z, and near/far depth to vertical Y.
             sketch.inverseViewProjection = new processing.core.PMatrix3D(
                 30, 0, 0, 0,
@@ -62,10 +67,39 @@ public class PathfindingTest {
             assert sketch.start != savedStart && sketch.goal == null && sketch.path.isEmpty();
             sketch.key = 'r';
             sketch.keyPressed();
+            awaitMap(sketch);
             assert sketch.start == null && sketch.goal == null && sketch.pendingSelection == null;
+            assert sketch.world != world && sketch.navigationGrid.world == sketch.world;
+            assert sketch.windView != null && sketch.inverseViewProjection == null;
+            map regenerated = sketch.world;
+            float previousHeight = regenerated.terrain[20][20];
+            float previousWindAngle = regenerated.globalWindAngle;
+            sketch.keyPressed();
+            awaitMap(sketch);
+            assert sketch.world != regenerated;
+            float angleDifference = Math.abs(sketch.world.globalWindAngle - previousWindAngle);
+            angleDifference = Math.min(angleDifference, PApplet.TWO_PI - angleDifference);
+            assert angleDifference >= PApplet.QUARTER_PI - 0.0001f : "A new map needs a new wind direction";
+            assert Math.abs(sketch.world.wind.solver.inletX
+                - Math.cos(sketch.world.globalWindAngle) * sketch.world.globalWindStrength * 300) < 0.001;
+            assert Math.abs(sketch.world.wind.solver.inletZ
+                - Math.sin(sketch.world.globalWindAngle) * sketch.world.globalWindStrength * 300) < 0.001;
+            assert sketch.world.terrain[20][20] != previousHeight : "R must change the terrain noise seed";
         } finally {
+            if (sketch.world != null) sketch.world.close();
             sketch.pathWorker.shutdownNow();
+            sketch.mapWorker.shutdownNow();
         }
+    }
+
+    static void awaitMap(src sketch) {
+        long deadline = System.nanoTime() + 20_000_000_000L;
+        while (sketch.pendingMap != null && !sketch.pendingMap.isDone() && System.nanoTime() < deadline) {
+            try { Thread.sleep(2); } catch (InterruptedException e) { throw new RuntimeException(e); }
+        }
+        assert sketch.pendingMap != null && sketch.pendingMap.isDone() : "Map worker must complete";
+        sketch.finishMap();
+        assert !sketch.pathStatus.contains("failed") : sketch.pathStatus;
     }
 
     static void click(src sketch, int x, int y) {
