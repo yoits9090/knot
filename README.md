@@ -1,90 +1,144 @@
-# mathhackshackathon
+# Toronto wind and 3D A*
 
-- `src/src.java`: Processing entry point, background map loading, camera, lighting, and rendering.
-- `src/CityScene.java`: Cached Bloor–Yonge OSM buildings/parts, heights, streets, and meshes.
-- `src/astar.java`: Six-direction A* through a 3D voxel grid.
-- `src/stableFluids.java`: 3D staggered-grid Stable Fluids solver, viscosity, and pressure projection.
-- `src/windSimulation.java`: Terrain/tree voxel boundaries and background fluid worker.
-- `src/windVisualization.java`: Advected particle trails rendered as speed-coloured moving ribbons.
-- `src/navigation.java`: Terrain/tree collision voxels and raycasting against terrain triangles.
-- `src/map.java`: Terrain generation, map data, wind, tree sway, and leaf physics.
-  Tree bending and leaf drag use the local simulated velocity.
+A Processing/Java 21 app with a citywide Toronto atlas, a local 3D Stable Fluids
+simulation driven by real Environment and Climate Change Canada observations,
+and visible incremental 3D A* searches.
 
-Run `src.main()` in your Java IDE, or compile and run from the project root
-on macOS/Linux with the jars in `lib`:
+Run from the project root with the jars in `lib`:
 
 ```sh
-javac -cp "lib/*" -d bin src/*.java
-java -cp "bin:lib/*" src
+javac -cp 'lib/*' -d bin src/*.java
+java -Xmx2g -cp 'bin:lib/*' src
 ```
 
-Click the terrain once to set the blue start marker, then again to set the green
-goal. A completed route appears as a green line. Endpoints snap to free voxels
-above the clicked terrain; tree trunks and canopies block the route, including
-their wind sway envelope. A third click starts a new route. Picking and search run in a background worker
-so the scene keeps animating; regenerating the map cancels pending work.
+## Controls
 
-The app starts in **Bloor–Yonge** mode, using the offline OpenStreetMap cache.
-Press **M** to switch between the city and the generated forest. Press **Space**
-to pause/resume the orbiting camera. **R** chooses a new wind direction and clears
-the route. In city mode it rebuilds the same cached neighbourhood; in forest mode
-it also generates new terrain and trees. Map preparation runs off the drawing
-thread. Clicks outside the terrain leave the current selection intact.
+| Key/input | Action |
+|---|---|
+| W / S | Move forward / backward across the ground plane |
+| A / D | Move sideways |
+| Q / E | Move down / up |
+| Left / Right arrows | Turn the horizontal camera angle |
+| Up / Down arrows | Tilt the camera |
+| Right mouse drag | Look around |
+| Mouse wheel | Change camera height |
+| Shift + movement | Move faster |
+| O | See all of Toronto from above |
+| P | New bird's-eye view of a route between random real intersections at random altitudes |
+| Left click twice | Select a roof, wall or ground surface for start/goal |
+| C | Toggle moving wind ribbons, ground-speed heatmap and speed legend |
+| R | Previous cached observed wind hour in Toronto; new map/wind in forest mode |
+| L | Fetch the latest available ECCC observation |
+| B | Show/hide the historical wind backtest results |
+| M | Switch between Toronto and the procedural forest |
 
-The Bloor–Yonge scene covers 460 × 460 metres centred on the actual mapped
-intersection, with white building volumes, a flat ground plane and cached streets.
-Building parts preserve towers and podiums. The HUD discloses inferred/default
-heights and links to OSM attribution. See [data provenance and assumptions](data/README.md).
-No network connection is needed to run it; `python3 scripts/cache-bloor-yonge.py`
-explicitly refreshes the cache. City wind is prescribed at 12 m/s, not live weather.
+A* expands **one actual cell every 0.05 seconds**, with no fast-forward or fake
+search geometry. Blue points are explored cells, gold points are the discovered
+frontier, pink points are blocked neighbours, and a yellow line shows the current
+candidate. The completed route is green. P replaces the search and fits the
+camera above its endpoints. Routes use six neighbours in a 10 m 3D grid, with
+random endpoint altitudes from 30–170 m above the flat ground. Building checks use a 1 m clearance envelope around points
+and every connecting segment; an entire 10 m cell is not treated as an obstacle
+when a building touches its edge. This keeps downtown intersections usable while
+preventing paths from crossing thin walls between samples. The displayed
+P start/goal coordinates are the real intersections; cell-centre quantization is
+used between them. Manual clicks raycast the nearest building roof/wall or ground
+using the actual extruded footprints, including courtyard holes. They retain the
+clicked 3D position, offset 3 m along the surface normal into free space, instead
+of snapping to an intersection or discarding the picked altitude. Building picking
+runs in the background through the atlas spatial buckets. Closely spaced points
+in one grid cell retain separate exact endpoints. A search cap of 250,000 discovered cells bounds memory.
+P chooses origins across the city, with the second intersection 0.5–1.8 km away
+so playback normally finishes in seconds rather than minutes. New routes can be
+requested during a search. Picking/loading run off the drawing thread; incremental
+search work is bounded to one expansion per rendered update. At low frame rates,
+playback slows down rather than skipping visible steps.
 
-Press **C** to show/hide flowing, speed-coloured ribbons, a ground wind-speed
-heatmap, and a compact speed legend; the HUD text shows whether the overlay is on
-or off. A small arrow at the top right shows wind travel direction in a fixed bird's-eye view (-Z is up, +X is right).
-The corner arrow indicates the prescribed incoming wind. Ribbon heads are particles
-advected with RK2 through the live 3D velocity field. Each ribbon retains about five
-seconds of position history, so both its head and tail move with the flow rather
-than displaying a stationary full-domain streamline. Short fragments and stalled
-trails are hidden or recycled; new inlet particles appear only after building a
-sufficiently long trail. Trails continue advancing while hidden. Blue/cyan represents slow
-flow and yellow/red fast flow. The legend uses a fixed scale per map in scene units
-per second, with its upper colour saturating at the labelled maximum. Leaves use
-the same simulated velocity with drag and gravity. Hiding the overlay does not stop
-physics. The ground heatmap samples wind 1.5 fluid cells above the terrain
-(about 46 scene units in the forest or 10.8 m in the city). Sheltered/solid areas are blue;
-faster flow progresses through green and yellow to red on exactly the same scale
-as the ribbons and legend. Ground colours update with each fluid snapshot and
-remain unlit so scene lighting cannot distort their numerical meaning.
+## Toronto coverage and rendering
 
-The solver follows [Jos Stam's Stable Fluids](https://www.dgp.toronto.edu/public_user/stam/reality/Research/pdf/ns.pdf):
-RK2 semi-Lagrangian velocity advection, implicit viscosity, and an incompressibility
-projection using a preconditioned conjugate-gradient pressure solve. A staggered
-MAC grid makes the pressure gradient and divergence compatible at solid faces.
-Wind enters the upwind X/Z boundaries and exits the downwind sides. The upper
-boundary is a slip boundary: no vertical flux, with zero tangential diffusion
-gradient. This prevents a shallow open roof from draining the incoming wind before
-it crosses the forest. Outer diffusion ghost values use zero gradients rather than
-artificially dragging velocities toward zero. Terrain, trunks, and canopies occupy
-impermeable voxels. Tree solids cover
-their bounded sway envelopes rather than rebuilding moving boundaries every frame.
+The cached **2025 City of Toronto building massing** contains 428,184 volumes.
+The official centreline cache contains 40,580 selected surface road segments
+and 18,133 intersections. The atlas spans the municipality, including Steeles,
+Etobicoke, Scarborough and the harbour/islands. It uses local east/south metres
+centred on Bloor/Yonge. All footprints and roads appear in the overview texture;
+nearby 500 m tiles show footprint extrusions, with batched meshes and a bounded
+cache. The city overview adds tall-building proxies. This is level-of-detail
+rendering, not every building at full mesh detail simultaneously. Near tiles load
+progressively. The ground is flat and building volumes use the City's `AVG_HEIGHT`
+field; roof form and terrain elevations are not reconstructed. The official major
+shoreline supplies the lake/island overview, joining endpoint gaps under 200 m.
 
-The forest grid is 64 x 17 x 64 (about 31 scene units per cell). The city grid is
-64 x 61 x 64 (7.19 m per cell) with more vertical room for the mapped towers.
-The city worker updates less often than rendering; its stable timestep is capped
-at 0.2 s for the lower prescribed speed. It may run slower than wall time under load. Thin trunks and
-canopies are conservatively voxelized, so their effective size is larger at this
-resolution. This is a coarse graphics fluid simulation, not an engineering-validated
-prediction of atmospheric turbulence. The solver runs on a background thread and
-publishes immutable velocity snapshots; R disposes of the old worker and rebuilds
-the fluid domain for the new map.
+The **640 × 640 m CFD window** follows the ground position viewed by the camera,
+including P routes. It is rebuilt in the background when moving far enough, at
+most once per three seconds. Only this local window has a resolved wind field;
+the rest of the city is geometry. The 64-cell fluid width gives 10 m cells, and
+the ground heatmap samples **15 m above ground**, not pedestrian height. The
+fluid roof lies at least 355 m above ground or 115 m above the tallest local
+building. Loading a new CFD window preserves a city route/search.
 
-Run the pathfinding and numerical fluid checks:
+## Real wind and backtesting
+
+Toronto starts from the cached latest valid hourly observation from **ECCC
+Toronto City Centre / Billy Bishop, climate ID 6158667**. The app requests the
+latest available observation on startup and every 15 minutes; L refreshes it
+immediately. A timeout or missing service leaves the dated cached value in place.
+The HUD always shows the observation UTC time and labels delayed observations.
+R enters historical mode and disables automatic latest refresh until L is used.
+These are hourly station observations, not a live street weather sensor network.
+
+ECCC wind speed is converted from km/h to m/s. Meteorological direction is
+reported in tens of degrees **from** north; it is converted to the direction the
+wind travels: `east = -speed*sin(from)`, `south = speed*cos(from)`. That vector
+drives the solver's inflow boundaries. It is not a randomized arrow field.
+Station measurements are imposed uniformly as the local boundary condition;
+no measured vertical profile is available.
+
+Press B to inspect the reproducible historical input backtest. The included
+cache has 2,040 valid hourly records, July 20–October 17, 2026. Only consecutive
+valid one-hour pairs enter evaluation. The first 70% of pairs fit a vector AR(1)
+model; the last 588 pairs are held out chronologically, with no shuffling. A
+one-hour persistence baseline is also evaluated. Speed MAE/RMSE, vector RMSE and
+circular direction MAE are reported; directions below 1 m/s are excluded.
+Persistence speed MAE is 1.093 m/s and vector RMSE 2.026 m/s. AR(1) speed MAE is
+1.160 m/s and vector RMSE 1.996 m/s: it does not improve speed MAE. The app uses
+actual observations for replay, not these baseline forecasts.
+
+**This backtests the station wind input, not street-level CFD accuracy.** Local
+flow, turbulence and altitude winds remain unvalidated without independent
+anemometer measurements. Flat terrain, 10 m fluid cells, estimated massing and
+simple inflow/roof conditions limit interpretation. This is a graphics fluid
+simulation, not an engineering wind-safety assessment.
+
+Refresh data explicitly (the app runs from caches offline):
 
 ```sh
-javac -cp "bin:lib/*" -d bin tests/*.java
-java -ea -cp "bin:lib/*" PathfindingTest
-java -ea -cp "bin:lib/*" FluidTest
-java -ea -cp "bin:lib/*" ParticleTrailTest
-java -ea -cp "bin:lib/*" SustainedWindTest
-java -ea -cp "bin:lib/*" CitySceneTest
+python3 scripts/cache-weather.py              # download observations and rerun backtest
+python3 scripts/cache-weather.py --offline    # reproduce from the included raw response
+# Geometry preparation dependencies are needed only when rebuilding the atlas:
+python3 -m venv /tmp/toronto-data-env
+/tmp/toronto-data-env/bin/pip install pyshp shapely pillow
+/tmp/toronto-data-env/bin/python scripts/cache-toronto.py
+```
+
+See [data/README.md](data/README.md) for provenance, source hashes and licences.
+
+## Simulation and checks
+
+`stableFluids.java` implements RK2 semi-Lagrangian advection, implicit diffusion
+and a PCG incompressibility projection on a staggered MAC grid, following
+[Stam's Stable Fluids](https://www.dgp.toronto.edu/public_user/stam/reality/Research/pdf/ns.pdf).
+Terrain/buildings/trees occupy conservative solid voxels. The roof has zero normal
+flow; horizontal upwind boundaries supply the measured vector and downwind sides
+are open. A background worker publishes immutable snapshots. Simulation may lag
+wall time under load. Ribbon particles use the actual sampled 3D field and retain
+about 19 seconds of history in the city (five seconds in the forest); the finite
+tails move and expire. Short/stalled fragments are filtered. Ground and ribbons
+use the same blue-to-red speed scale. Forest leaves and tree bending also sample
+the simulated velocity. The small Bloor/Yonge OSM loader remains covered by tests.
+
+```sh
+javac -cp 'bin:lib/*' -d /tmp/mathhack-checks tests/*.java
+for test in BuildingPickingTest TorontoTest PathfindingTest CitySceneTest FluidTest ParticleTrailTest SustainedWindTest; do
+  java -ea -Xmx2g -cp '/tmp/mathhack-checks:bin:lib/*' "$test"
+done
 ```

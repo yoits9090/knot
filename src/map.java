@@ -62,7 +62,7 @@ public class map {
         this.processing = processing;
         this.city = city;
         if (city != null) {
-            w = h = (int) CityScene.SPAN;
+            w = h = (int) city.span;
             scale = 5;
             cols = w / scale + 1;
             rows = h / scale + 1;
@@ -110,9 +110,10 @@ public class map {
         }
     }
 
-    float airTop() { return city == null ? -terrainHeight / 2 - 260 : -city.tallest - 115; }
-    float inletSpeed() { return globalWindStrength * (city == null ? 300 : 30); }
-    float visualScale() { return city == null ? 1 : CityScene.SPAN / 1980f; }
+    float airTop() { return city == null ? -terrainHeight / 2 - 260 : -Math.max(city.tallest, 240) - 115; }
+    float observedWindSpeed = -1;
+    float inletSpeed() { return observedWindSpeed >= 0 ? observedWindSpeed : globalWindStrength * (city == null ? 300 : 30); }
+    float visualScale() { return city == null ? 1 : city.span / 1980f; }
 
     void startWind() {
         wind = new windSimulation(this);

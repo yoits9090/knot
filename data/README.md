@@ -29,3 +29,44 @@ The nominal 7.19 m fluid cells cannot resolve narrow alleys or fine facade detai
 The city wind is a prescribed 12 m/s incoming flow with a random direction per
 reset, not a live weather feed. Numerical flow is for visual exploration, not a
 validated assessment of pedestrian wind safety.
+
+## Citywide Toronto atlas and weather
+
+The default citywide atlas in `toronto/` supersedes the small OSM scene described
+above. It uses official [City of Toronto 3D massing](https://open.toronto.ca/dataset/3d-massing/)
+(2025 release) and [Toronto Centreline](https://open.toronto.ca/dataset/toronto-centreline-tcl/).
+Contains information licensed under the
+[Open Government Licence – Toronto](https://open.toronto.ca/open-data-license/).
+`toronto/source.json` records exact download URLs, input SHA-256 hashes, counts,
+bounds and assumptions. The source shapefile is Web Mercator despite its WGS84
+filename; the builder reads and converts its declared CRS to local metres.
+
+All 428,184 building footprints are retained, with City `AVG_HEIGHT` as extrusion
+height (no fallback heights were needed in this release). Nearby tiles retain
+footprint courtyards. Distant overview heights use tall-building bounding volumes;
+all footprints and selected streets remain visible in the overview texture.
+Ground is flat. Shoreline geometry is from the same official centreline dataset;
+endpoint gaps up to 200 m are bridged for the overview lake polygon. This is an
+approximate display coastline, not a navigation chart. Street intersection IDs
+and names come from centreline endpoints with three or more incident segments
+and at least two named roads. Air routing uses 10 m spacing with 1 m swept segment clearance; CFD uses a
+separate 640 m window with 10 m cells and a 15 m AGL heatmap sampling height.
+
+Weather comes from [ECCC Hourly Climate Observations](https://api.weather.gc.ca/collections/climate-hourly),
+Toronto City Centre (climate identifier 6158667). The raw GeoJSON response, source
+URL and fetch time are in `weather/eccc-city-centre.json`. Valid records (including
+calm records but excluding nonempty quality flags and missing noncalm directions)
+are normalized in `weather/observations.csv`. `backtest.json` contains the exact
+time range, chronological split, fitted coefficients and aggregate results;
+`backtest-predictions.csv` contains every held-out prediction and observation.
+Use `scripts/cache-weather.py --offline` to reproduce these results without a new
+download. ECCC data is subject to the
+[Government of Canada's open-data terms](https://climate.weather.gc.ca/prods_servs/attachment1_e.html).
+
+The app fetches the latest available valid station observation at startup and at
+15-minute intervals, with a 25-second request deadline; it retains dated cached
+wind on failure. The displayed observation time is never substituted with the
+fetch time. R replays older actual records, and L returns to the latest available
+record. Aged observations are labelled delayed. No local ground or altitude wind
+measurements are implied. The backtest evaluates one-hour station input forecasts;
+it does not validate the CFD around buildings.

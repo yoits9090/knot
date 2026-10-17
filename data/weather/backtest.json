@@ -1,0 +1,41 @@
+{
+  "source": "https://api.weather.gc.ca/collections/climate-hourly/items?f=json&limit=10000&STATION_NAME=TORONTO+CITY+CENTRE&datetime=2026-07-19T20%3A31%3A54Z%2F2026-10-17T20%3A31%3A54Z&sortby=UTC_DATE",
+  "fetched_utc": "2026-10-17T20:31:54.797231+00:00",
+  "station": "TORONTO CITY CENTRE (6158667, Billy Bishop)",
+  "observation_count": 2040,
+  "first_utc": "2026-07-20T02:00:00Z",
+  "last_utc": "2026-10-17T04:00:00Z",
+  "train_pairs": 1369,
+  "test_pairs": 588,
+  "test_start_utc": "2026-09-21T06:00:00Z",
+  "test_end_utc": "2026-10-17T04:00:00Z",
+  "horizon_hours": 1,
+  "split": "chronological 70/30; no shuffled samples; only consecutive valid hourly pairs",
+  "ar1_coefficients": [
+    [
+      0.04602922521885583,
+      0.8872079518389286
+    ],
+    [
+      0.01591748035464853,
+      0.8282011365257016
+    ]
+  ],
+  "metrics": {
+    "persistence": {
+      "speed_mae_ms": 1.0926870748299284,
+      "speed_rmse_ms": 1.444965819620196,
+      "vector_rmse_ms": 2.02615718523847,
+      "direction_mae_deg": 15.666666666666666,
+      "direction_count": 570
+    },
+    "ar1": {
+      "speed_mae_ms": 1.160341999152152,
+      "speed_rmse_ms": 1.5026357441755527,
+      "vector_rmse_ms": 1.996449065680455,
+      "direction_mae_deg": 15.893348557782414,
+      "direction_count": 562
+    }
+  },
+  "limits": "Station-level one-hour input forecast backtest. Not validation of street-level CFD or altitude winds. Calm wind directions (<1 m/s) excluded from direction MAE."
+}

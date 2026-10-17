@@ -14,6 +14,7 @@ public class windVisualization {
     private final java.util.Random random = new java.util.Random(42); // Seed locations only.
     private final PVector wind = new PVector(), middleWind = new PVector();
     final float maxSpeed;
+    private final float sampleSeconds, minimumSpeed;
     private final int[][] groundColors;
     private stableFluids.Snapshot groundField;
 
@@ -42,6 +43,8 @@ public class windVisualization {
 
     windVisualization(map world) {
         this.world = world;
+        sampleSeconds = world.city == null ? SAMPLE_SECONDS : 0.15f;
+        minimumSpeed = world.city == null ? 2 : Math.max(0.05f,world.inletSpeed()*0.03f);
         groundColors = new int[world.cols][world.rows];
         float inletSpeed = world.wind == null ? world.inletSpeed()
             : PApplet.sqrt(world.wind.solver.inletX * world.wind.solver.inletX
@@ -69,7 +72,7 @@ public class windVisualization {
             float y = world.surfaceHeightAt(x, z) - 45 * world.visualScale() - random.nextFloat() * 185 * world.visualScale();
             if (!field.contains(x, y, z) || field.isSolid(x, y, z)) continue;
             field.sample(x, y, z, wind);
-            if (wind.magSq() < 4) continue;
+            if (wind.magSq() < minimumSpeed*minimumSpeed) continue;
             trail.position.set(x, y, z);
             trail.append(wind.mag());
             return;
@@ -89,7 +92,7 @@ public class windVisualization {
                 remaining -= dt;
                 PVector point = trail.position;
                 field.sample(point.x, point.y, point.z, wind);
-                trail.stalledSeconds = wind.magSq() < 4 ? trail.stalledSeconds + dt : 0;
+                trail.stalledSeconds = wind.magSq() < minimumSpeed*minimumSpeed ? trail.stalledSeconds + dt : 0;
                 if (trail.stalledSeconds > 0.35f) { respawn(trail, field, true); break; }
                 float mx = point.x + wind.x * dt / 2, my = point.y + wind.y * dt / 2, mz = point.z + wind.z * dt / 2;
                 if (!field.contains(mx, my, mz) || field.isSolid(mx, my, mz)) {
@@ -108,8 +111,8 @@ public class windVisualization {
                 if (blocked) { respawn(trail, field, true); break; }
                 point.add(dx, dy, dz);
                 trail.clock += dt;
-                if (trail.clock + 0.000001f >= SAMPLE_SECONDS) {
-                    trail.clock -= SAMPLE_SECONDS;
+                if (trail.clock + 0.000001f >= sampleSeconds) {
+                    trail.clock -= sampleSeconds;
                     field.sample(point.x, point.y, point.z, wind);
                     trail.append(wind.mag());
                 }
@@ -119,7 +122,9 @@ public class windVisualization {
 
     boolean visible(Trail trail) {
         float cell = world.windSnapshot == null ? world.scale : world.windSnapshot.cell;
-        if (trail.count < 6 || trail.length < Math.max(70 * world.visualScale(), cell * 2.5f)) return false;
+        float minimumLength = world.city == null ? Math.max(70*world.visualScale(),cell*2.5f)
+            : Math.max(cell*0.8f,Math.min(cell*2.5f,world.inletSpeed()*5));
+        if (trail.count < 6 || trail.length < minimumLength) return false;
         float minX = Float.POSITIVE_INFINITY, minY = minX, minZ = minX;
         float maxX = Float.NEGATIVE_INFINITY, maxY = maxX, maxZ = maxX;
         for (int n = 0; n < trail.count; n++) {
@@ -129,7 +134,7 @@ public class windVisualization {
             minZ = Math.min(minZ, trail.z[i]); maxZ = Math.max(maxZ, trail.z[i]);
         }
         // A tightly coiled/stagnant trace must not become another tiny "hair".
-        return Math.max(maxX - minX, Math.max(maxY - minY, maxZ - minZ)) >= cell * 1.5f;
+        return Math.max(maxX - minX, Math.max(maxY - minY, maxZ - minZ)) >= cell * (world.city == null ? 1.5f : 0.6f);
     }
 
     private static float distance(float x, float y, float z, float px, float py, float pz) {
@@ -213,7 +218,7 @@ public class windVisualization {
         app.textSize(10);
         app.textAlign(PApplet.LEFT, PApplet.BASELINE);
         app.fill(225);
-        app.text(world.city == null ? "Wind speed (units/s)" : "Wind speed (m/s, prescribed)", left, top + 10);
+        app.text(world.city == null ? "Wind speed (units/s)" : "Wind speed (m/s, simulated)", left, top + 10);
         for (int pixel = 0; pixel < (int) width; pixel++) {
             app.fill(speedColor(pixel / (width - 1) * maxSpeed, maxSpeed));
             app.rect(left + pixel, top + 17, 1, 7);

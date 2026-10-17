@@ -22,7 +22,34 @@ public class CitySceneTest {
             assert building.bounds.getMinY() >= -CityScene.SPAN / 2 - 0.001;
             assert building.bounds.getMaxY() <= CityScene.SPAN / 2 + 0.001;
         }
-        src sketch = new src(); sketch.width = 800; sketch.height = 600;
+        // Validate the batched roof triangulation, including courtyard holes.
+        class CapturedMesh extends PShape {
+            final java.util.List<PVector> points = new java.util.ArrayList<>();
+            CapturedMesh() { super(PShape.GEOMETRY); }
+            @Override public void vertex(float x,float y,float z) { points.add(new PVector(x,y,z)); }
+            @Override public int getVertexCount() { return points.size(); }
+            @Override public PVector getVertex(int i) { return points.get(i); }
+        }
+        PApplet meshHost = new PApplet() {
+            @Override public PShape createShape() { return new CapturedMesh(); }
+        };
+        PShape mesh = city.createMesh(meshHost);
+        double expectedArea = 0, roofArea = 0;
+        for (CityScene.Building building : city.buildings) {
+            double area = 0;
+            for(float[] ring : building.rings) for(int i=0;i<ring.length;i+=2) {
+                int j=(i+2)%ring.length;
+                area += ring[i]*(double)ring[j+1]-ring[j]*(double)ring[i+1];
+            }
+            expectedArea += Math.abs(area)/2;
+        }
+        assert mesh.getVertexCount()%3==0;
+        for(int i=0;i<mesh.getVertexCount();i+=3) {
+            PVector a=mesh.getVertex(i),b=mesh.getVertex(i+1),c=mesh.getVertex(i+2);
+            if(a.y==b.y&&b.y==c.y) roofArea += Math.abs((b.x-a.x)*(double)(c.z-a.z)-(c.x-a.x)*(double)(b.z-a.z))/2;
+        }
+        assert Math.abs(roofArea-expectedArea)<expectedArea*0.0001 : "Roof triangles must preserve polygon and hole area: " + roofArea + " vs " + expectedArea + "; " + mesh.getVertexCount() + " vertices";
+        src sketch = new src(); sketch.torontoMode = false; sketch.width = 800; sketch.height = 600;
         try {
             long begin = System.nanoTime();
             sketch.regenerateMap();

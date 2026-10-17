@@ -14,6 +14,7 @@ public final class CityScene {
     final double latitude, longitude;
     int taggedHeights, levelHeights, defaultHeights;
     float tallest;
+    float span = SPAN, centerX, centerZ;
     private PShape mesh;
 
     static final class Building {
@@ -125,6 +126,31 @@ public final class CityScene {
             else defaultHeights++;
         }
         if (buildings.isEmpty()) throw new IllegalArgumentException("No usable OSM buildings in the requested area");
+    }
+
+    private CityScene(float x, float z, float span) {
+        latitude = 43.6702351; longitude = -79.3867611;
+        centerX = x; centerZ = z; this.span = span;
+    }
+    static CityScene window(TorontoAtlas atlas, float x, float z, float span) {
+        CityScene scene = new CityScene(x, z, span);
+        Area domain = new Area(new Rectangle2D.Float(-span/2,-span/2,span,span));
+        int id = 0;
+        for (TorontoAtlas.Volume volume : atlas.query(x-span/2,z-span/2,span)) {
+            Area area = volume.footprint(x,z); area.intersect(domain);
+            if(area.isEmpty()) continue;
+            scene.buildings.add(new Building("city/"+(id++), "", "city-2025", volume.height, 0, area));
+            scene.tallest = Math.max(scene.tallest, volume.height);
+        }
+        if(span != TorontoAtlas.TILE) for (Road road : atlas.roads) {
+            java.util.List<Float> selected = new ArrayList<>();
+            for(int i=0;i<road.points.length;i+=2) {
+                float xx=road.points[i]-x, zz=road.points[i+1]-z;
+                if(Math.abs(xx)<=span/2 && Math.abs(zz)<=span/2){selected.add(xx);selected.add(zz);}
+            }
+            if(selected.size()>=4){float[] points=new float[selected.size()];for(int i=0;i<points.length;i++)points[i]=selected.get(i);scene.roads.add(new Road(road.name,points,road.width));}
+        }
+        return scene;
     }
 
     float[] project(double lat, double lon) {
@@ -242,36 +268,42 @@ public final class CityScene {
         if (mesh == null) mesh = createMesh(app);
         app.shape(mesh);
     }
-    private PShape createMesh(PApplet app) {
-        PShape group = app.createShape(PApplet.GROUP);
-        for (Building building : buildings) {
-            PShape walls = app.createShape(); walls.beginShape(PApplet.QUADS);
-            walls.noStroke(); walls.fill(235, 238, 241);
-            for (float[] ring : building.rings) for (int i = 0; i < ring.length; i += 2) {
-                int next = (i + 2) % ring.length;
-                float x = ring[i], z = ring[i + 1], xx = ring[next], zz = ring[next + 1];
-                float distance = (float) Math.hypot(xx - x, zz - z);
-                if (distance < 0.0001f) continue;
-                walls.normal((zz - z) / distance, 0, (x - xx) / distance);
-                walls.vertex(x, -building.bottom, z); walls.vertex(xx, -building.bottom, zz);
-                walls.vertex(xx, -building.height, zz); walls.vertex(x, -building.height, z);
+    PShape createMesh(PApplet app) {
+        // One batched mesh per tile, including concave roofs and courtyard holes.
+        // GLU is already provided by Processing/JOGL; edge flags force triangles.
+        PShape shape = app.createShape(); shape.beginShape(PApplet.TRIANGLES); shape.noStroke();
+        com.jogamp.opengl.glu.GLUtessellator tess = com.jogamp.opengl.glu.GLU.gluNewTess();
+        com.jogamp.opengl.glu.GLUtessellatorCallbackAdapter callback = new com.jogamp.opengl.glu.GLUtessellatorCallbackAdapter() {
+            @Override public void vertex(Object data) {double[] v=(double[])data;shape.vertex((float)v[0],(float)v[1],(float)v[2]);}
+            @Override public void combine(double[] coords,Object[] data,float[] weight,Object[] out){out[0]=coords.clone();}
+            @Override public void edgeFlag(boolean boundary) { }
+            @Override public void error(int code) {throw new IllegalStateException("Roof triangulation failed: "+code);}
+        };
+        com.jogamp.opengl.glu.GLU.gluTessCallback(tess,com.jogamp.opengl.glu.GLU.GLU_TESS_VERTEX,callback);
+        com.jogamp.opengl.glu.GLU.gluTessCallback(tess,com.jogamp.opengl.glu.GLU.GLU_TESS_COMBINE,callback);
+        com.jogamp.opengl.glu.GLU.gluTessCallback(tess,com.jogamp.opengl.glu.GLU.GLU_TESS_EDGE_FLAG,callback);
+        com.jogamp.opengl.glu.GLU.gluTessCallback(tess,com.jogamp.opengl.glu.GLU.GLU_TESS_ERROR,callback);
+        com.jogamp.opengl.glu.GLU.gluTessProperty(tess,com.jogamp.opengl.glu.GLU.GLU_TESS_WINDING_RULE,com.jogamp.opengl.glu.GLU.GLU_TESS_WINDING_ODD);
+        com.jogamp.opengl.glu.GLU.gluTessNormal(tess,0,-1,0);
+        for(Building building:buildings) {
+            shape.fill(225,231,237);
+            for(float[] ring:building.rings) for(int i=0;i<ring.length;i+=2) {
+                int j=(i+2)%ring.length;float x=ring[i],z=ring[i+1],xx=ring[j],zz=ring[j+1];
+                float distance=(float)Math.hypot(xx-x,zz-z);if(distance<.0001f)continue;
+                shape.normal((zz-z)/distance,0,(x-xx)/distance);
+                shape.vertex(x,-building.bottom,z);shape.vertex(xx,-building.bottom,zz);shape.vertex(xx,-building.height,zz);
+                shape.vertex(x,-building.bottom,z);shape.vertex(xx,-building.height,zz);shape.vertex(x,-building.height,z);
             }
-            walls.endShape(); group.addChild(walls);
-            for (float[] outer : building.rings) {
-                if (signedArea(outer) >= 0) continue;
-                PShape roof = app.createShape(); roof.beginShape(); roof.noStroke(); roof.fill(250, 251, 252);
-                roof.normal(0, -1, 0);
-                for (int i = 0; i < outer.length; i += 2) roof.vertex(outer[i], -building.height, outer[i + 1]);
-                Path2D.Float outerPath = path(outer);
-                for (float[] hole : building.rings) if (signedArea(hole) > 0 && outerPath.contains(hole[0], hole[1])) {
-                    roof.beginContour();
-                    for (int i = 0; i < hole.length; i += 2) roof.vertex(hole[i], -building.height, hole[i + 1]);
-                    roof.endContour();
-                }
-                roof.endShape(PApplet.CLOSE); group.addChild(roof);
+            shape.fill(245,248,250);shape.normal(0,-1,0);
+            com.jogamp.opengl.glu.GLU.gluTessBeginPolygon(tess,null);
+            for(float[] ring:building.rings) {
+                com.jogamp.opengl.glu.GLU.gluTessBeginContour(tess);
+                for(int i=0;i<ring.length;i+=2){double[] v={ring[i],-building.height,ring[i+1]};com.jogamp.opengl.glu.GLU.gluTessVertex(tess,v,0,v);}
+                com.jogamp.opengl.glu.GLU.gluTessEndContour(tess);
             }
+            com.jogamp.opengl.glu.GLU.gluTessEndPolygon(tess);
         }
-        return group;
+        com.jogamp.opengl.glu.GLU.gluDeleteTess(tess);shape.endShape();return shape;
     }
     void drawRoads(PApplet app, boolean heatmap) {
         app.pushStyle(); app.noLights(); app.noFill();
@@ -281,7 +313,7 @@ public final class CityScene {
             app.strokeWeight(heatmap ? 1 : 3);
             for (int i = 2; i < road.points.length; i += 2) {
                 float x = road.points[i - 2], z = road.points[i - 1], xx = road.points[i], zz = road.points[i + 1];
-                if (Math.max(Math.abs(x), Math.abs(z)) <= SPAN / 2 && Math.max(Math.abs(xx), Math.abs(zz)) <= SPAN / 2)
+                if (Math.max(Math.abs(x), Math.abs(z)) <= span / 2 && Math.max(Math.abs(xx), Math.abs(zz)) <= span / 2)
                     app.line(x, -0.25f, z, xx, -0.25f, zz);
             }
         }

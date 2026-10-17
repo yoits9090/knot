@@ -34,6 +34,20 @@ public class ParticleTrailTest {
         for (int i = 0; i < 30; i++) view.update(1f / 60);
         for (windVisualization.Trail particle : view.trails)
             assert !view.visible(particle) : "Stopped particles must not leave stationary hairs";
+        // Real station winds can be much slower than the old prescribed 12 m/s.
+        map city = new map(new PApplet(), CityScene.load());
+        city.observedWindSpeed = 3.6f;
+        stableFluids slow = new stableFluids(16, 16, 16, 20, -160, -320, -160,
+            new boolean[18*18*18],0,0);
+        setVelocity(slow,3.6f,0,0); city.windSnapshot = slow.latest;
+        windVisualization cityView = new windVisualization(city);
+        windVisualization.Trail cityTrail = cityView.trails[0];
+        cityTrail.count=0;cityTrail.length=cityTrail.clock=cityTrail.stalledSeconds=0;
+        cityTrail.position.set(0,-150,0);cityTrail.append(3.6f);
+        for(int i=0;i<1200;i++) cityView.update(1f/60);
+        assert Math.abs(cityTrail.position.x-72)<0.02 : "Actual slow winds must not be sped up for display";
+        assert cityView.visible(cityTrail) : "Observed station speeds need a sufficiently long visible history";
+        assert cityTrail.x[cityTrail.point(0)] > 1 : "City tails must expire too";
         System.out.println("Particle trail tests passed (3D advection, moving tail, short-fragment filtering, boundary recycling, speed sampling).");
     }
 

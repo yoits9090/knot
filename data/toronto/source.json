@@ -1,0 +1,36 @@
+{
+  "fetched_utc": "2026-10-17T20:37:02.099665+00:00",
+  "sources": [
+    {
+      "package": "3d-massing",
+      "resource": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/387b2e3b-2a76-4199-8b3b-0b7d22e2ec10/resource/667237d6-4d3c-4cf3-8cb7-e91c48d59375/download/3dmassingshapefile_2025_wgs84.zip",
+      "name": "3DMassingShapefile_2025_WGS84.zip",
+      "sha256": "9617089710518f1a24f70ca11b4a7c20ae45ab8e52a6fbed1bc088192efe6285",
+      "license": "notspecified"
+    },
+    {
+      "package": "toronto-centreline-tcl",
+      "resource": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/1d079757-377b-4564-82df-eb5638583bfb/resource/6bb36aba-9747-4255-abb6-b8754fc23c0f/download/centreline-version-2-4326.gpkg",
+      "name": "Centreline - Version 2 - 4326.gpkg",
+      "sha256": "edee3db042f8967e6b2fe31bba13114393f1afac03473a7ee2f2b403aee9a3b4",
+      "license": null
+    }
+  ],
+  "origin": {
+    "lat": 43.6702351,
+    "lon": -79.3867611
+  },
+  "bounds_metres": [
+    -21172.3805415492,
+    -21100.923281008367,
+    23064.277862098956,
+    10033.69918438098
+  ],
+  "buildings": 428184,
+  "roads": 40580,
+  "intersections": 18133,
+  "fallback_heights": 0,
+  "height_policy": "City 2025 AVG_HEIGHT; flat ground. 6m fallback for missing/nonpositive height. Extrusions approximate roof forms.",
+  "rendering": "All footprints in overview texture. Nearby footprint extrusions and distant tall-building proxies; LOD retains citywide coverage.",
+  "license": "Contains information licensed under the Open Government Licence - Toronto."
+}

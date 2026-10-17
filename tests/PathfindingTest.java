@@ -111,6 +111,11 @@ public class PathfindingTest {
         assert sketch.pendingSelection != null && sketch.pendingSelection.isDone()
             : "Selection worker must complete";
         sketch.finishSelection();
+        if(sketch.search != null) {
+            while(!sketch.search.done) sketch.search.step();
+            sketch.path = sketch.search.path;
+            sketch.pathStatus = sketch.path.isEmpty() ? "No route" : "Route complete: " + sketch.path.size();
+        }
     }
 
     static void testSearch() {
