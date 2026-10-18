@@ -1,4 +1,4 @@
-# Scientific Model Debugger
+# knot
 
 A Java tool for finding thermodynamic inconsistencies in kinetic state graphs,
 explaining conflicting cycles, and comparing repairs against measurement uncertainty.
@@ -73,4 +73,4 @@ and generated fixtures stay local and ignored.
 - [Equations and numerical validation](docs/multibind-core.md)
 - [Data sources and attribution](third_party/README.md)
 
-The previous Toronto CFD/drone-pathfinding application is preserved on [`old`](https://github.com/yoits9090/mathhackshackathon/tree/old).
+The previous Toronto CFD/drone-pathfinding application is preserved on [`old`](https://github.com/yoits9090/knot/tree/old).
