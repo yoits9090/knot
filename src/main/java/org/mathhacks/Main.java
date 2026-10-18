@@ -13,7 +13,7 @@ public final class Main {
     public static void main(String[] args) throws Exception {
         Locale.setDefault(Locale.ROOT);
         if (args.length == 0 || args[0].equals("--help")) {
-            System.out.println("Scientific Model Debugger — multibind numerical core");
+            System.out.println("knot — thermodynamic model debugger");
             System.out.println("  energies STATES.csv GRAPH.csv [--ph VALUE] [--concentration NAME=VALUE]...");
             System.out.println("  rates RATES.csv");
             System.out.println("  serve [PORT]  # local JavaScript workspace, default 8080");
