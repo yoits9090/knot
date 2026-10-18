@@ -6,10 +6,15 @@
 *.class
 *.log
 
+# Downloaded scientific inputs and generated reference data (see third_party/README.md)
+/examples/
+/src/test/resources/upstream/
+
 # Local editor and OS files
 .idea/
 *.iml
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .DS_Store
 
 # Local configuration and credentials

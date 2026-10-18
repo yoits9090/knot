@@ -1,0 +1,14 @@
+{
+    "java.project.sourcePaths": [
+        "src/main/java",
+        "src/test/java"
+    ],
+    "java.project.outputPath": "build/ide-classes",
+    "java.project.referencedLibraries": [
+        "build/deps/commons-math3-3.6.1.jar"
+    ],
+    "java.import.exclusions": [
+        "**/build/**",
+        "**/.git/**"
+    ]
+}
