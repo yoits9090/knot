@@ -1,158 +1,76 @@
 # Scientific Model Debugger
 
-A Java tool for checking thermodynamic consistency in kinetic state graphs.
-The project goal is to explain small conflicting reaction sets and compare
-repairs against uncertainty and experimental observations.
+A Java tool for finding thermodynamic inconsistencies in kinetic state graphs,
+explaining conflicting cycles, and comparing repairs against measurement uncertainty.
+Includes a local visual workspace and a command-line interface.
 
-**Implemented:** multibind's numerical foundation: uncertain free-energy
-measurements -> consistent state energies, covariance and equilibrium
-populations; uncertain forward/reverse rates -> consistent rate pairs. The
-CLI debugger adds signed cycle explanations, uncertainty-aware diagnostics,
-exact energy/pKa locks, bounded sparse repair alternatives, and Markdown/JSON
-reports. A simple local JavaScript workspace provides the network graph,
-cycle explanations, parameter locks, repair comparisons, and report downloads.
-Automatic model-assumption inference and experimental-data fitting are not
-implemented.
+## What works
 
-Based on Kenney & Beckstein (2023), [Thermodynamically consistent determination
-of free energies and rates in kinetic cycle models](https://doi.org/10.1016/j.bpr.2023.100120).
-See [the implementation and validation notes](docs/multibind-core.md) and
-[the project brief for future sessions](AGENTS.md).
+- Consistent state energies, covariance, equilibrium populations, and rate pairs
+- Signed cycle witnesses with uncertainty-aware diagnostics
+- Exact energy/pKa locks and bounded sparse repair alternatives
+- Interactive network graph, cycle inspection, and repair comparisons
+- Markdown and JSON reports with assumptions and input hashes
+- Numerical regression checks against multibind's published examples
 
-## Open the visual workspace
+## Quick start
+
+Requires JDK 21+, Make, and Python 3 for the initial dependency download.
 
 ```sh
 make workspace
 ```
 
-Open [127.0.0.1:8080](http://127.0.0.1:8080). Use `make workspace PORT=8081`
-to choose another port. The interface is plain JavaScript, HTML, CSS, and SVG;
-there is no npm setup, frontend framework, or frontend build step. It calls
-the same Java investigation core as the CLI.
+Open [127.0.0.1:8080](http://127.0.0.1:8080), load the synthetic example,
+confirm the model assumptions, and select **Analyze model**. Inspect a cycle,
+lock trusted parameters, and compare candidate repairs. Calculations run locally
+through the Java solver. Use `make workspace PORT=8081` to change the port.
 
-Load the synthetic example or upload/paste your states and transitions CSVs.
-Confirm the model assumptions and select **Analyze model**. Select a cycle
-to inspect its signed equation, choose candidate repairs to compare changes,
-and use the parameter checkboxes to lock trusted measurements. JSON and
-Markdown exports include the complete investigation and input hashes.
-
-After `make data`, the example menu also offers the published YiiP model.
-The server binds only to loopback; uploads are analyzed locally and their
-temporary copies are deleted after each request. Nothing is saved back to
-the input model. See [the workspace guide](docs/workspace.md) for scope and
-verification.
-
-## Investigate a model
-
-The tracked synthetic example needs no scientific-data download:
+For the CLI:
 
 ```sh
 make run ARGS='investigate samples/investigation/states.csv samples/investigation/corrupted.csv --assume-equilibrium'
-make run ARGS='investigate samples/investigation/states.csv samples/investigation/corrupted.csv --assume-equilibrium --lock 1,2'
-make run ARGS='investigate samples/investigation/states.csv samples/investigation/corrupted.csv --assume-equilibrium --format json --output build/investigation.json'
 ```
 
-Reports show which transition set fails cycle closure, the signed calculation,
-propagated measurement uncertainty, statistical tests, and competing candidate
-repairs. They expose search bounds and input hashes. A contradiction does not
-identify which measurement is wrong. Locks preserve the supplied parameter at
-the declared conditions; all three contradictory locks produce a certificate
-and exit code 3. See [the investigation guide](docs/investigation.md) and
-[the step-by-step implementation goal](docs/IMPLEMENTATION_PLAN.md).
+Add `--lock 1,2` to preserve input edges or `--format json` for JSON output.
 
-## Build and run
+## How it works
 
-Requires JDK 21+, Make, and Python 3 for the initial checksum-verified download
-of Commons Math 3.6.1. After that, the Java application runs without Python or
-network access. Run commands from the repository root.
+Measurements define energy differences between molecular states. The solver
+estimates a consistent set of state energies using uncertainty-weighted least
+squares, then exposes cycles whose signed differences fail to close. Constrained
+repairs preserve locked measurements; a bounded sparse search offers alternatives
+that change fewer parameters.
 
-```sh
-make run                          # CLI help
-make data                         # fetch pinned sources; generate local test data and CLI examples
-make run ARGS='energies examples/diamond/states.csv examples/diamond/graph.csv --ph 5'
-make run ARGS='rates examples/transporter-rates.csv'
-make run ARGS='energies examples/yiip-site-a/states.csv examples/yiip-site-a/graph.csv --ph 6.5 --concentration Zn=0.000001'
-make run ARGS='energies examples/dtpa-central/states.csv examples/dtpa-central/graph.csv --ph 7'
-make run ARGS='rates examples/transporter-diffusion-rates.csv'
-make clean                        # remove compiled output; retain download caches
-```
+The numerical core follows Kenney & Beckstein (2023),
+[Thermodynamically consistent determination of free energies and rates in kinetic cycle models](https://doi.org/10.1016/j.bpr.2023.100120).
+It uses Commons Math 3.6.1 for SVD and plain JavaScript/HTML/SVG for the workspace.
 
-Scientific input tables and generated reference outputs are **not committed**.
-`make data` requires Git, Python 3.11, 3.12, or 3.13, and network access for the
-initial setup. It recreates the ignored `examples/` and
-`src/test/resources/upstream/` directories, including local provenance with
-source revisions and input hashes. Source URLs, original paths, and licensing
-are documented in [third-party attribution](third_party/README.md). You can
-also run the CLI directly on your own CSV files without preparing these data.
+## Scope
 
-For ligand binding, add e.g. `--concentration Na+=0.15`; concentrations and
-standard-state concentrations must use the same units (normally molar).
-Free energies are dimensionless beta*G, conventionally called kT units.
-Input variance columns contain **variances**, not standard deviations.
-
-For VS Code or Devin, open `mathhackshackathon.code-workspace` to load the
-Java source folders and Commons Math classpath. Run `make build` once after a
-fresh clone to download the dependency. Folder settings are also included for
-single-folder windows; the workspace file covers Java settings that require
-workspace scope in multi-folder windows.
-
-CSV output includes state energies, probabilities, measured/fitted differences,
-residuals, and (for rate inputs) projected rates and the paper's approximate
-rate errors. Rate matrices use `i,j = i -> j` and zero diagonals; they are not
-continuous-time generator matrices.
+Supports reversible molecular-state graphs with compatible equilibrium or
+standard-state inputs. Users must confirm these assumptions. Repair costs measure
+adjustment relative to input uncertainty; independent experimental-data fitting
+and general SBML import are not implemented. Sparse search is bounded, and a
+consistent repair is a candidate rather than proof of correct chemistry.
 
 ## Verify
 
 ```sh
-make data                         # one-time setup; also rerun to recreate local data
-make test                         # local oracle fixtures + analytic/invalid-input tests; offline after setup
-make test-workspace               # HTTP/core integration; synthetic tests need no research-data setup
-make reference                    # rerun authors' tests and generate fresh independent oracle outputs
+make test-workspace  # synthetic HTTP/core checks; no scientific-data setup needed
+make data            # download pinned sources and generate local reference fixtures
+make test            # analytic, regression, investigation, and CLI tests
+make reference       # fresh comparisons with the authors' implementation
 ```
 
-`make test` compares 47 reference example conditions, covering free energies,
-covariance, populations, macrostate energies/errors, and rate matrices/errors.
-Fixtures have source commit IDs and input SHA-256 hashes. The nine-state rate
-regression is ill-conditioned and has a separately documented tolerance plus
-an independent closed-form ring check.
+`make data` requires Git, Python 3.11–3.13, and network access. Downloaded data
+and generated fixtures stay local and ignored.
 
-The expanded examples include a published YiiP zinc-transporter binding-site
-model (32 states, 80 transitions), three DTPA fitted parameter sets, and four
-additional transporter rate variants. There is also a negative test for an
-upstream YiiP site-B table that omits eight states referenced by its graph.
-These verify the numerical implementation and evaluate supplied fitted models;
-they do not independently validate the experiments or repeat parameter fitting.
+## Documentation
 
-`make reference` needs Python 3.11, 3.12, or 3.13 and network access for its first
-setup. It installs an isolated, pinned Python oracle under ignored
-`build/reference/`, runs the authors' 30 tests, checks fresh outputs against
-local fixtures created by `make data`, then compares Java against the fresh
-outputs. The Java implementation never calls that oracle during normal use.
-It also checks the new equality-constrained repair solver against an independent
-SciPy null-space formulation on 12 seeded networks. `make test` includes the
-controlled-corruption, trust-policy, sparse-search, and CLI/export tests.
-`make test-workspace` verifies the local workspace transport, exact agreement
-with CLI reports, locking/conflicts, exports, input validation, and local file
-isolation. If YiiP data is available locally it also checks that graph.
+- [Visual workspace](docs/workspace.md)
+- [CLI investigations and input formats](docs/investigation.md)
+- [Equations and numerical validation](docs/multibind-core.md)
+- [Data sources and attribution](third_party/README.md)
 
-## Scientific scope
-
-Supported inputs are connected graphs of well-defined molecular states with
-reversible transitions and compatible equilibrium/standard-state measurements.
-Declared concentrations can shift proton/ligand binding energies. Driven
-nonequilibrium rates must be reduced to compatible intrinsic/standard-state
-inputs before correction; the app cannot infer that transformation.
-
-Consistency is not proof that measurements are correct, the model is complete,
-or its chemistry is experimentally valid. Missing states/reactions cannot be
-reconstructed by this method. The paper's Gaussian assumptions and uncertainty
-approximations are exposed rather than treated as exact statistical guarantees.
-
-## Previous project and attribution
-
-The complete Toronto CFD/drone-pathfinding app and its runtime jars are
-preserved on the pushed `old` branch. The new work remains on `main`.
-
-Sources for the locally downloaded examples and generated regression data are
-attributed in [third-party notices](third_party/README.md). The existing multibind Python
-implementation is the independent reference, not a Java runtime dependency.
+The previous Toronto CFD/drone-pathfinding application is preserved on [`old`](https://github.com/yoits9090/mathhackshackathon/tree/old).
