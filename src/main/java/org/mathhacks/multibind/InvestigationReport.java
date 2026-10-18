@@ -176,7 +176,8 @@ public final class InvestigationReport {
         for (int i = 0; i < items.length; i += 2) result.put((String) items[i], items[i + 1]);
         return result;
     }
-    private static String encode(Object value) {
+    /** Strict JSON encoder shared by the local workspace transport. */
+    public static String encode(Object value) {
         if (value == null) return "null";
         if (value instanceof String text) {
             StringBuilder out = new StringBuilder("\"");

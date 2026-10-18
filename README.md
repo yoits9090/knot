@@ -9,13 +9,38 @@ measurements -> consistent state energies, covariance and equilibrium
 populations; uncertain forward/reverse rates -> consistent rate pairs. The
 CLI debugger adds signed cycle explanations, uncertainty-aware diagnostics,
 exact energy/pKa locks, bounded sparse repair alternatives, and Markdown/JSON
-reports. There is no graphical UI, automatic model-assumption inference, or
-experimental-data fitting yet.
+reports. A simple local JavaScript workspace provides the network graph,
+cycle explanations, parameter locks, repair comparisons, and report downloads.
+Automatic model-assumption inference and experimental-data fitting are not
+implemented.
 
 Based on Kenney & Beckstein (2023), [Thermodynamically consistent determination
 of free energies and rates in kinetic cycle models](https://doi.org/10.1016/j.bpr.2023.100120).
 See [the implementation and validation notes](docs/multibind-core.md) and
 [the project brief for future sessions](AGENTS.md).
+
+## Open the visual workspace
+
+```sh
+make workspace
+```
+
+Open [127.0.0.1:8080](http://127.0.0.1:8080). Use `make workspace PORT=8081`
+to choose another port. The interface is plain JavaScript, HTML, CSS, and SVG;
+there is no npm setup, frontend framework, or frontend build step. It calls
+the same Java investigation core as the CLI.
+
+Load the synthetic example or upload/paste your states and transitions CSVs.
+Confirm the model assumptions and select **Analyze model**. Select a cycle
+to inspect its signed equation, choose candidate repairs to compare changes,
+and use the parameter checkboxes to lock trusted measurements. JSON and
+Markdown exports include the complete investigation and input hashes.
+
+After `make data`, the example menu also offers the published YiiP model.
+The server binds only to loopback; uploads are analyzed locally and their
+temporary copies are deleted after each request. Nothing is saved back to
+the input model. See [the workspace guide](docs/workspace.md) for scope and
+verification.
 
 ## Investigate a model
 
@@ -81,6 +106,7 @@ continuous-time generator matrices.
 ```sh
 make data                         # one-time setup; also rerun to recreate local data
 make test                         # local oracle fixtures + analytic/invalid-input tests; offline after setup
+make test-workspace               # HTTP/core integration; synthetic tests need no research-data setup
 make reference                    # rerun authors' tests and generate fresh independent oracle outputs
 ```
 
@@ -105,6 +131,9 @@ outputs. The Java implementation never calls that oracle during normal use.
 It also checks the new equality-constrained repair solver against an independent
 SciPy null-space formulation on 12 seeded networks. `make test` includes the
 controlled-corruption, trust-policy, sparse-search, and CLI/export tests.
+`make test-workspace` verifies the local workspace transport, exact agreement
+with CLI reports, locking/conflicts, exports, input validation, and local file
+isolation. If YiiP data is available locally it also checks that graph.
 
 ## Scientific scope
 

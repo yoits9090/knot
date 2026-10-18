@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Model investigation</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<header>
+  <div><h1>Model investigation</h1><p>Inspect thermodynamic cycles and compare consistent repairs.</p></div>
+  <div class="actions"><button id="export-json" disabled>Export JSON</button><button id="export-markdown" disabled>Export Markdown</button></div>
+</header>
+<main>
+  <section aria-labelledby="input-title">
+    <h2 id="input-title">Model</h2>
+    <div class="actions">
+      <label>Example <select id="example"><option value="corrupted">Synthetic · injected error</option><option value="consistent">Synthetic · consistent control</option></select></label>
+      <button id="load-example" disabled>Load example</button>
+      <span id="source-note">Upload CSV files or load a synthetic example.</span>
+    </div>
+    <form id="model-form">
+      <div class="inputs">
+        <label>States CSV <input id="states-file" type="file" accept=".csv,text/csv"><textarea id="states" rows="5" spellcheck="false" required aria-label="States CSV contents" placeholder="name&#10;A&#10;B&#10;C"></textarea></label>
+        <label>Transitions CSV <input id="graph-file" type="file" accept=".csv,text/csv"><textarea id="graph" rows="5" spellcheck="false" required aria-label="Transitions CSV contents" placeholder="state1,state2,value,variance,ligand,standard_state"></textarea></label>
+      </div>
+      <div class="actions conditions">
+        <label>pH <input id="ph" type="number" value="0" step="any" required></label>
+        <label>Ligand concentrations <input id="concentrations" placeholder="Zn=0.000001 Na+=0.15"></label>
+        <details><summary>Search settings</summary><div class="actions">
+          <label>Significance α <input id="alpha" type="number" value="0.01" min="0.000000001" max="0.999999999" step="any" required></label>
+          <label>Max changed parameters <input id="max-changes" type="number" value="2" min="0" max="4" required></label>
+          <label>Support budget <input id="budget" type="number" value="2000" min="1" max="10000" required></label>
+        </div></details>
+      </div>
+      <label class="assertion"><input id="equilibrium" type="checkbox" required> These are compatible equilibrium/standard-state measurements, with complete relevant molecular states.</label>
+      <p class="note">Energies: kT. Input uncertainty: variance, not standard deviation. Ligand concentrations must match the input standard-state units. Driven models are outside this workflow.</p>
+      <button id="analyze" type="submit" disabled>Analyze model</button>
+    </form>
+  </section>
+  <p id="message" role="status" aria-live="polite">Connecting to the local Java solver…</p>
+  <div id="results" hidden>
+    <section aria-labelledby="summary-title"><h2 id="summary-title">Investigation</h2><p id="summary"></p><p id="statistics" class="note"></p></section>
+    <div class="workspace">
+      <section aria-labelledby="network-title">
+        <div class="actions"><h2 id="network-title">Network</h2><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button><button id="reset-layout">Reset layout</button><label><input id="show-values" type="checkbox"> Show all values</label></div>
+        <p id="graph-caption" class="note"></p>
+        <svg id="network" viewBox="0 0 900 540" role="group" aria-label="Interactive molecular state network"></svg>
+        <p class="note">Drag states to rearrange or the background to pan. Select an edge to inspect its parameter. Arrows mark the sign reference for reversible transitions. <span class="cycle-key">Orange: selected cycle.</span> <span class="lock-key">Blue: locked.</span> <span class="change-key">Green: changed by candidate.</span></p>
+        <p id="selection" aria-live="polite">Select a transition or state.</p>
+      </section>
+      <section aria-labelledby="cycle-title">
+        <h2 id="cycle-title">Cycle explanation</h2>
+        <label>Witness <select id="cycle"></select></label>
+        <div id="cycle-explanation"></div>
+        <p class="note">These witnesses form a cycle basis. They are not an exhaustive or globally shortest conflict search. A cycle does not identify which measurement is wrong.</p>
+      </section>
+    </div>
+    <section aria-labelledby="repairs-title">
+      <h2 id="repairs-title">Compare repairs</h2>
+      <p class="note">Costs measure changes relative to input uncertainty, not fit to independent experiments. Candidates are not automatically applied to the model.</p>
+      <div class="table-scroll"><table id="repair-table"><thead><tr><th>Inspect</th><th>Candidate</th><th>Changed parameters</th><th>Measurement χ²</th></tr></thead><tbody></tbody></table></div>
+      <p id="search-status" class="note"></p>
+    </section>
+    <section aria-labelledby="parameters-title">
+      <div class="actions"><h2 id="parameters-title">Parameters</h2><button id="unlock-all">Unlock all</button></div>
+      <p class="note">Lock a parameter to preserve its supplied value at the declared conditions. Each lock change recalculates the candidates. “Candidate SE” is conditional on locks and the selected support.</p>
+      <div class="table-scroll"><table id="parameters"><thead><tr><th>Lock</th><th>Edge</th><th>Transition</th><th>Input parameter</th><th>Unit</th><th>Candidate parameter</th><th>Change / energy SE</th><th>Candidate SE (kT)</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section><details><summary>Assumptions, limitations, and provenance</summary><ul id="assumptions"></ul><pre id="provenance"></pre></details></section>
+  </div>
+</main>
+</body>
+</html>

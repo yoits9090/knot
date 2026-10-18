@@ -1,0 +1,345 @@
+/* ------------------------------------------------------------------------
+   Theme
+   ------------------------------------------------------------------------ */
+
+:root {
+  --text: #222;
+  --text-muted: #555;
+  --page: #f7f8fa;
+  --surface: #fff;
+  --canvas: #fcfcfd;
+  --border: #ddd;
+  --border-light: #eee;
+  --border-control: #bbb;
+  --row-border: #e6e6e6;
+  --hover: #edf2f8;
+  --focus: #386cbe;
+  --primary: #234f8b;
+  --error: #a12820;
+
+  /* Legend colours; edge strokes come from EDGE_COLORS in app.js. */
+  --cycle: #a95400;
+  --locked: #2457a4;
+  --changed: #187744;
+
+  --row-active: #edf3fc;
+  --row-highlight: #fff3df;
+  --node-stroke: #526276;
+  --node-selected: #e4eafa;
+
+  --mono: ui-monospace, monospace;
+
+  font: 15px/1.5 system-ui, sans-serif;
+  color: var(--text);
+  background: var(--page);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------------------
+   Page layout
+   ------------------------------------------------------------------------ */
+
+body {
+  margin: 0;
+}
+
+header,
+main {
+  max-width: 1450px;
+  margin: auto;
+  padding: 20px;
+}
+
+header,
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+header {
+  justify-content: space-between;
+}
+
+section {
+  min-width: 0;
+  margin-bottom: 16px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+/* Two equal input columns; results use a wide network + narrower sidebar. */
+.inputs,
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.workspace {
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
+}
+
+.conditions {
+  margin: 14px 0;
+}
+
+.assertion {
+  margin-top: 8px;
+}
+
+/* A heading inside an action bar pushes the buttons to the right. */
+.actions h2 {
+  margin: 0 auto 0 0;
+}
+
+details .actions {
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------------------------
+   Typography
+   ------------------------------------------------------------------------ */
+
+h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+p {
+  margin: 8px 0;
+}
+
+header p,
+.note,
+#source-note {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+summary {
+  cursor: pointer;
+}
+
+#message {
+  min-height: 24px;
+}
+
+#message.error,
+.conflict {
+  color: var(--error);
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.equation {
+  font: 16px/1.7 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+/* Colour legend under the network. */
+.cycle-key  { color: var(--cycle); }
+.lock-key   { color: var(--locked); }
+.change-key { color: var(--changed); }
+
+/* ------------------------------------------------------------------------
+   Form controls
+   ------------------------------------------------------------------------ */
+
+button,
+select,
+input,
+textarea {
+  font: inherit;
+}
+
+button,
+select,
+input:not([type=checkbox], [type=radio]),
+textarea {
+  padding: 6px 9px;
+  border: 1px solid var(--border-control);
+  border-radius: 3px;
+}
+
+button {
+  background: var(--surface);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#analyze {
+  margin-top: 8px;
+  color: white;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+label {
+  display: inline-block;
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  font: 13px/1.5 var(--mono);
+  resize: vertical;
+}
+
+input[type=file] {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+input[type=number] { width: 95px; }
+#budget            { width: 110px; }
+#concentrations    { width: 230px; }
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+svg [tabindex]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------------
+   Network graph (SVG)
+   ------------------------------------------------------------------------ */
+
+svg {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  background: var(--canvas);
+  border: 1px solid var(--border-light);
+  touch-action: none;
+}
+
+svg text {
+  font: 13px system-ui, sans-serif;
+  fill: var(--text);
+  pointer-events: none;
+  /* Halo so labels stay legible over edges. */
+  paint-order: stroke;
+  stroke: var(--canvas);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+svg .edge {
+  cursor: pointer;
+}
+
+svg .edge path {
+  fill: none;
+  stroke-width: 2;
+}
+
+/* Wide invisible stroke that makes thin edges easy to click. */
+svg .edge .hit {
+  stroke: transparent;
+  stroke-width: 16;
+}
+
+svg .node {
+  cursor: grab;
+}
+
+svg .node circle {
+  fill: var(--surface);
+  stroke: var(--node-stroke);
+  stroke-width: 2;
+}
+
+svg .selected circle {
+  fill: var(--node-selected);
+}
+
+/* ------------------------------------------------------------------------
+   Tables
+   ------------------------------------------------------------------------ */
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+th,
+td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--row-border);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+tr.active    { background: var(--row-active); }
+tr.highlight { background: var(--row-highlight); }
+
+td.changed {
+  color: var(--changed);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------------
+   Responsive
+   ------------------------------------------------------------------------ */
+
+@media (max-width: 1000px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .inputs {
+    grid-template-columns: 1fr;
+  }
+
+  header,
+  main {
+    padding: 12px;
+  }
+}

@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.util.*;
 import org.mathhacks.multibind.*;
 
-/** Numerical command-line entry point; no UI or automatic model-assumption inference. */
+/** Numerical CLI and local visual-workspace entry point. */
 public final class Main {
     private Main() {
     }
@@ -16,6 +16,7 @@ public final class Main {
             System.out.println("Scientific Model Debugger — multibind numerical core");
             System.out.println("  energies STATES.csv GRAPH.csv [--ph VALUE] [--concentration NAME=VALUE]...");
             System.out.println("  rates RATES.csv");
+            System.out.println("  serve [PORT]  # local JavaScript workspace, default 8080");
             System.out.println("  investigate STATES.csv GRAPH.csv --assume-equilibrium [options]");
             System.out.println("    --ph VALUE --concentration NAME=VALUE --lock 1,2 --alpha 0.01");
             System.out.println("    --max-changes 2 --search-budget 2000 --alternatives 3");
@@ -25,7 +26,9 @@ public final class Main {
             return;
         }
         try {
-            if (args[0].equals("investigate")) {
+            if (args[0].equals("serve") && args.length <= 2) {
+                WorkspaceServer.run(args.length == 2 ? Integer.parseInt(args[1]) : 8080);
+            } else if (args[0].equals("investigate")) {
                 int code = InvestigationCli.run(Arrays.copyOfRange(args, 1, args.length));
                 if (code != 0) System.exit(code);
             } else if (args[0].equals("energies") && args.length >= 3) {

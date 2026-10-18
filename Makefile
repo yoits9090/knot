@@ -1,4 +1,4 @@
-.PHONY: build run data test reference clean
+.PHONY: build run workspace data test test-workspace reference clean
 
 JAR = build/deps/commons-math3-3.6.1.jar
 SOURCES = $(shell find src/main/java -name '*.java')
@@ -14,6 +14,12 @@ build: $(JAR)
 
 run: build
 	java -cp 'build/classes:$(JAR)' org.mathhacks.Main $(ARGS)
+
+workspace: build
+	java -cp 'build/classes:$(JAR)' org.mathhacks.Main serve $(PORT)
+
+test-workspace: build
+	python3 scripts/test-workspace.py
 
 data:
 	python3 scripts/reference-check.py --regenerate
