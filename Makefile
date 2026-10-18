@@ -24,6 +24,7 @@ test: build
 	javac --release 21 -Xlint:all -cp 'build/classes:$(JAR)' -d build/test-classes $(TEST_SOURCES)
 	java -ea -cp 'build/classes:build/test-classes:$(JAR)' org.mathhacks.multibind.CoreTest $(REFERENCE_DIR)
 	java -ea -cp 'build/classes:build/test-classes:$(JAR)' org.mathhacks.multibind.InvestigationTest
+	python3 scripts/test-investigation-cli.py --reference-dir "$(REFERENCE_DIR)"
 
 reference:
 	python3 scripts/reference-check.py

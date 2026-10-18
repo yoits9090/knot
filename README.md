@@ -6,14 +6,34 @@ repairs against uncertainty and experimental observations.
 
 **Implemented:** multibind's numerical foundation: uncertain free-energy
 measurements -> consistent state energies, covariance and equilibrium
-populations; uncertain forward/reverse rates -> consistent rate pairs.
-There is a command-line interface. There is no graphical UI, automatic model
-assumption inference, sparse repair search, or experimental-data fitting yet.
+populations; uncertain forward/reverse rates -> consistent rate pairs. The
+CLI debugger adds signed cycle explanations, uncertainty-aware diagnostics,
+exact energy/pKa locks, bounded sparse repair alternatives, and Markdown/JSON
+reports. There is no graphical UI, automatic model-assumption inference, or
+experimental-data fitting yet.
 
 Based on Kenney & Beckstein (2023), [Thermodynamically consistent determination
 of free energies and rates in kinetic cycle models](https://doi.org/10.1016/j.bpr.2023.100120).
 See [the implementation and validation notes](docs/multibind-core.md) and
 [the project brief for future sessions](AGENTS.md).
+
+## Investigate a model
+
+The tracked synthetic example needs no scientific-data download:
+
+```sh
+make run ARGS='investigate samples/investigation/states.csv samples/investigation/corrupted.csv --assume-equilibrium'
+make run ARGS='investigate samples/investigation/states.csv samples/investigation/corrupted.csv --assume-equilibrium --lock 1,2'
+make run ARGS='investigate samples/investigation/states.csv samples/investigation/corrupted.csv --assume-equilibrium --format json --output build/investigation.json'
+```
+
+Reports show which transition set fails cycle closure, the signed calculation,
+propagated measurement uncertainty, statistical tests, and competing candidate
+repairs. They expose search bounds and input hashes. A contradiction does not
+identify which measurement is wrong. Locks preserve the supplied parameter at
+the declared conditions; all three contradictory locks produce a certificate
+and exit code 3. See [the investigation guide](docs/investigation.md) and
+[the step-by-step implementation goal](docs/IMPLEMENTATION_PLAN.md).
 
 ## Build and run
 
@@ -82,6 +102,9 @@ setup. It installs an isolated, pinned Python oracle under ignored
 `build/reference/`, runs the authors' 30 tests, checks fresh outputs against
 local fixtures created by `make data`, then compares Java against the fresh
 outputs. The Java implementation never calls that oracle during normal use.
+It also checks the new equality-constrained repair solver against an independent
+SciPy null-space formulation on 12 seeded networks. `make test` includes the
+controlled-corruption, trust-policy, sparse-search, and CLI/export tests.
 
 ## Scientific scope
 

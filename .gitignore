@@ -5,10 +5,19 @@
 /bin/
 *.class
 *.log
+*.jar
 
 # Downloaded scientific inputs and generated reference data (see third_party/README.md)
 /examples/
 /src/test/resources/upstream/
+/data/
+/datasets/
+
+# Local Python tooling and caches
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
 
 # Local editor and OS files
 .idea/

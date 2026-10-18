@@ -1,6 +1,7 @@
 package org.mathhacks;
 
 import java.nio.file.Path;
+import java.io.IOException;
 import java.util.*;
 import org.mathhacks.multibind.*;
 
@@ -15,12 +16,19 @@ public final class Main {
             System.out.println("Scientific Model Debugger — multibind numerical core");
             System.out.println("  energies STATES.csv GRAPH.csv [--ph VALUE] [--concentration NAME=VALUE]...");
             System.out.println("  rates RATES.csv");
+            System.out.println("  investigate STATES.csv GRAPH.csv --assume-equilibrium [options]");
+            System.out.println("    --ph VALUE --concentration NAME=VALUE --lock 1,2 --alpha 0.01");
+            System.out.println("    --max-changes 2 --search-budget 2000 --alternatives 3");
+            System.out.println("    --format markdown|json --output REPORT_PATH");
             System.out.println("Energies are in kT; input variances are variances, not standard deviations.");
             System.out.println("Use compatible equilibrium/standard-state inputs with all relevant states included.");
             return;
         }
         try {
-            if (args[0].equals("energies") && args.length >= 3) {
+            if (args[0].equals("investigate")) {
+                int code = InvestigationCli.run(Arrays.copyOfRange(args, 1, args.length));
+                if (code != 0) System.exit(code);
+            } else if (args[0].equals("energies") && args.length >= 3) {
                 double pH = 0;
                 Map<String, Double> concentrations = new LinkedHashMap<>();
                 for (int i = 3; i < args.length; i++) {
@@ -44,7 +52,7 @@ public final class Main {
                         System.out.printf("%s,%s,%.17g,%.17g%n", csv(states.get(i).name()), csv(states.get(j).name()),
                                           result.rate(i, j), result.paperStandardError(i, j));
             } else throw new IllegalArgumentException("Invalid command; use --help");
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IOException e) {
             System.err.println("Input/analysis error: " + e.getMessage());
             System.exit(2);
         }

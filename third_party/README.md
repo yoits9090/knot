@@ -7,7 +7,9 @@ are cached under ignored `build/reference/`. The setup script
 [`scripts/reference-check.py`](../scripts/reference-check.py) specifies all
 input paths and test conditions; its local `provenance.json` records source
 commits, input SHA-256 hashes, and the Python environment. Only code,
-documentation, and license notices are intended for version control.
+documentation, license notices, and tiny self-authored synthetic test examples
+in `samples/investigation/` are intended for version control. Downloaded
+research datasets, dependency jars, caches, and generated reports stay local.
 
 ## Multibind
 

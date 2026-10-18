@@ -246,6 +246,7 @@ def main():
         if old_meta["inputs"] != new_meta["inputs"]:
             raise SystemExit("Reference input hashes differ from saved provenance")
     run(["make", "test", "REFERENCE_DIR=" + str(output)], cwd=ROOT)
+    run([python, ROOT / "scripts/test-investigation-cli.py", "--oracle"], cwd=ROOT)
     if args.regenerate:
         prepare_examples(output)
         print("Prepared ignored local fixtures and CLI examples.")

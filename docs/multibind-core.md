@@ -174,8 +174,13 @@ available under `examples/`.
 
 This is a dense numerical implementation for small/moderate molecular state
 graphs. It does not yet implement SBML import, generalized reaction-network
-stoichiometry, atom/charge checks, missing-state inference, exact parameter
-locks, sparse minimal repairs, minimal conflict localization, time integration,
+stoichiometry, atom/charge checks, missing-state inference, individual
+directed-rate locks, globally shortest conflict localization, time integration,
 driven transport, inverse Monte Carlo, or a UI. It cannot establish that a
 consistent model is experimentally correct. Users must supply compatible
 conditions and complete, appropriate state definitions.
+
+The subsequent [investigation workflow](investigation.md) adds signed
+cycle-basis explanations, exact locks on energy/pKa parameters, conditional
+uncertainty, and bounded minimum-change alternatives without changing the
+author-compatible core calculations described above.

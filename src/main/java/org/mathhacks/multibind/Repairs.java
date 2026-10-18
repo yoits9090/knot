@@ -176,7 +176,7 @@ public final class Repairs {
                                   "budget exhausted; no sparse repair found, not a proof of infeasibility");
         }
         return new Search(List.of(), enumeration.tested, budget, Math.min(maxChanges, pool.size()), null,
-                          false, true, false, "no repair within the evaluated change limit");
+                          false, false, false, "no repair within the completely evaluated change limit");
     }
     private static final class Enumeration {
         private final Multibind.Fit fit;
